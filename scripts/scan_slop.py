@@ -645,10 +645,13 @@ def build_report(root: str, blobs: dict):
         add("generic_title", out["title"])
 
     tells = [f for f in findings if f["severity"] == "tell"]
-    n_tells = sum(f["count"] for f in tells)
+    # the skill's threshold is 4+ triggered *patterns*, not 4+ instances of one
+    n_tells = len(tells)
+    n_instances = sum(f["count"] for f in tells)
     verdict = "slop" if n_tells >= TELL_THRESHOLD else ("review" if findings else "clean")
     out["findings"] = findings
     out["tell_count"] = n_tells
+    out["tell_instances"] = n_instances
     out["verdict"] = verdict
     out["exit"] = {"clean": 0, "review": 1, "slop": 2}[verdict]
     out["files_scanned"] = files
@@ -687,8 +690,9 @@ def collect(root: str):
 
 
 def render_text(rep):
-    lines = [f"verdict: {rep['verdict'].upper()}  (tells={rep['tell_count']}, "
-             f"exit={rep['exit']}, files={len(rep['files_scanned'])})"]
+    lines = [f"verdict: {rep['verdict'].upper()}  (tells={rep['tell_count']}/{TELL_THRESHOLD}, "
+             f"instances={rep['tell_instances']}, exit={rep['exit']}, "
+             f"files={len(rep['files_scanned'])})"]
     if not rep["findings"]:
         lines.append("  no findings")
     for f in rep["findings"]:
