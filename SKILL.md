@@ -166,7 +166,14 @@ Every shipped page has:
 
 ## Final audit pass (run on the built code, not the plan)
 
-Read your own HTML/CSS like a stranger's and count:
+Run the scanner first. It handles the countable checks below and prints a
+verdict with an exit code:
+
+```bash
+python3 scripts/scan_slop.py ./dist --text
+```
+
+Then read your own HTML/CSS like a stranger's and count the rest:
 1. Identity faces outside the banned/burned pool? (Inter: check it against the leniency clause, not a flat ban)
 2. Accent colors doing numbered jobs ≤ 2?
 3. All-caps micro-labels: count them. >3 total = cut.

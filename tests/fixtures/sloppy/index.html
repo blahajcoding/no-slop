@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Home</title>
+  <style>
+    body {
+      font-family: Inter, sans-serif;
+      background: #0b0b12;
+      color: #e8e8f0;
+      margin: 0;
+      padding: 13px;
+    }
+    .hero {
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      border-radius: 8px;
+      box-shadow: 0 0 40px rgba(124, 58, 237, 0.5);
+      backdrop-filter: blur(12px);
+    }
+    h1 em { font-style: italic; color: #a855f7; }
+    .card {
+      padding: 22px;
+      margin-bottom: 18px;
+      gap: 20px;
+      border-radius: 12px;
+      border-left: 3px solid #8b5cf6;
+      border-top: 3px solid #6366f1;
+      transition: transform 200ms ease;
+    }
+    .card .card { border-radius: 18px; }
+    .card:hover { transform: translateY(-6px); }
+    .metric { border-radius: 9999px; padding: 9px 13px; }
+    .pill { border-radius: 24px; }
+    .flag { background: var(--background); border-radius: 6px; }
+    .micro { text-transform: uppercase; letter-spacing: 0.1em; }
+    .micro2 { text-transform: uppercase; }
+    .micro3 { text-transform: uppercase; }
+    .micro4 { text-transform: uppercase; }
+    .rev { opacity: 0; }
+    button { outline: none; }
+    .ghost { color: #8a8a99; background: #6f6f80; }
+    .grad { background: linear-gradient(#fff, #000); }
+    .grad2 { background: radial-gradient(#fff, #000); }
+    .grad3 { background: conic-gradient(#fff, #000); }
+    .glow { box-shadow: 0 4px 30px hsl(265 85% 60%); }
+    .glass { backdrop-filter: saturate(180%) blur(8px); }
+  </style>
+</head>
+<body>
+  <h1><em>Transform</em> your workflow</h1>
+  <p>Supercharge your team. Effortless, seamless, blazing fast.</p>
+  <div class="card hero">
+    <div class="card" data-note="nested">
+      <span class="metric">99.9% uptime</span>
+      <span class="pill">10k+ users</span>
+    </div>
+  </div>
+  <ol>
+    <li>Create an account</li>
+    <li>Connect a source</li>
+    <li>Invite your team</li>
+    <li>Ship it</li>
+  </ol>
+  <p class="micro">Section</p><p class="micro2">Section</p>
+  <p class="micro3">Section</p><p class="micro4">Section</p>
+  <p class="rev">Hidden until you scroll</p>
+  <p>Launched in 2019. &copy; 2019 Vibe Co</p>
+  <p>Rocket Lab "Electron" is a small-lift vehicle. See the Neutron update. Great question, let's dive in.</p>
+</body>
+</html>

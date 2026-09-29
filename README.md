@@ -139,16 +139,29 @@ the content, or a named brand decision, say so in the plan and name the
 alternative you rejected. That is what the skill asks for anyway: a decision
 you can point at beats a pattern you did not notice.
 
+## Tests
+
+```bash
+python3 tests/test_scan_slop.py
+```
+
+53 assertions across 11 fixtures, one per bug found while building this. They
+run against the script in place, so a fixture failing means a check regressed.
+
 ## Adding a check
 
 1. Add the regex and the check function.
 2. Register it in `CHECKS` with its rule number and severity. Unregistered
    checks report as `?`, which is a bug.
-3. Add a fixture under `fixtures/<name>/` that fails before the change.
+3. Add a fixture under `tests/fixtures/<name>/` that fails before the change.
 4. Assert on the JSON output.
 
 A check without a fixture is a guess. Most of the initial ones were wrong in
 ways that only showed up when run against real projects.
+
+## License
+
+MIT. See `LICENSE`.
 
 ## Contributing
 
