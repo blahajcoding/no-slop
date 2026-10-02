@@ -101,6 +101,22 @@ SPACING_DECL = re.compile(
 SPACING_TOKEN = re.compile(r"^([\d.]+)px$")
 
 # name -> (doc rule, severity). "tell" counts toward the verdict, "review" does not.
+# container-reflex tells: a status pill with a decorative dot, and an icon
+# locked inside its own rounded, filled box.
+PILL_SEL = re.compile(r"pill|badge|chip|kicker|status|lozenge", re.I)
+DOT_SEL = re.compile(r"(?:^|[^a-z])dot(?:$|[^a-z])", re.I)
+ROUND_RADIUS = re.compile(r"border-radius\s*:\s*([^;}]+)", re.I)
+SQUARE_SIZE = re.compile(r"width\s*:\s*(\d+(?:\.\d+)?)px[^}]*?height\s*:\s*(\d+(?:\.\d+)?)px", re.I)
+ICON_SEL = re.compile(r"icon|glyph|badge|tile|(?:^|[^a-z])ico(?:$|[^a-z])", re.I)
+BOX_BG = re.compile(r"background(?:-color)?\s*:\s*(?!0(?:\s|;|\}|$)|none|transparent)[^;}]+", re.I)
+BOX_BORDER = re.compile(r"border\s*:\s*(?!0(?:\s|;|\}|$)|none)[^;}]+", re.I)
+CSS_RULE = re.compile(r"([^{}]*)\{([^{}]*)\}")
+GRID_COLS = re.compile(r"grid-template-columns\s*:\s*([^;}]+)", re.I)
+GRID_REPEAT = re.compile(r"repeat\(\s*([3-9])\b", re.I)
+GRID_AUTOFIT = re.compile(r"repeat\(\s*auto-fit", re.I)
+GRID_GAP = re.compile(r"(?:^|[;{\s])gap\s*:", re.I)
+PADDING_DECL = re.compile(r"(?:^|[;{\s])padding\s*:", re.I)
+
 CHECKS = {
     "default_fonts":            ("Rule 1", "tell"),
     "inter_sole_identity":      ("Rule 1", "review"),
@@ -116,6 +132,10 @@ CHECKS = {
     "left_border_cards":        ("Rule 2", "tell"),
     "top_accent_borders":       ("Rule 2", "review"),
     "nested_cards":             ("Rule 3", "tell"),
+    "status_pill":              ("Rule 3", "tell"),
+    "icon_box":                 ("Rule 3", "tell"),
+    "nested_surfaces":          ("Rule 3", "tell"),
+    "uniform_feature_grid":     ("Rule 3", "tell"),
     "numbered_steps":           ("Rule 3", "tell"),
     "stat_banner_hits":         ("Rule 3", "review"),
     "distinct_radius_values":   ("Rule 4", "tell"),
@@ -402,6 +422,185 @@ def check_nested_cards(html):
     return nested
 
 
+def _rule_base(selector):
+    return re.split(r"[:\s>+~]", selector.strip())[0].strip()
+
+
+def _big_radius(value):
+    """True when a border-radius token reads as a pill (>=20px, or >=50%)."""
+    for tok in re.split(r"\s+", value.strip()):
+        m = re.match(r"^(\d+(?:\.\d+)?)(px|%)?$", tok)
+        if not m:
+            continue
+        n = float(m.group(1))
+        if m.group(2) == "%" and n >= 50:
+            return True
+        if n >= 20:
+            return True
+    return False
+
+
+def check_status_pill(css):
+    """A pill/badge carrying a decorative status dot: chrome posing as state."""
+    pills, dots = set(), set()
+    for m in CSS_RULE.finditer(css):
+        sel, body = m.group(1), m.group(2)
+        base = _rule_base(sel)
+        if not base:
+            continue
+        rad = ROUND_RADIUS.search(body)
+        if not rad:
+            continue
+        round_ = "50%" in rad.group(1)
+        size = SQUARE_SIZE.search(body)
+        small = bool(size and float(size.group(1)) <= 14 and float(size.group(2)) <= 14)
+        if round_ and small:
+            dots.add(base)
+        if DOT_SEL.search(sel) and round_:
+            dots.add(base)
+        if PILL_SEL.search(base) and _big_radius(rad.group(1)) and not (round_ and small):
+            pills.add(base)
+    hits = set()
+    for p in pills:
+        for d in dots:
+            if d == p or d.startswith(p) or p.startswith(d):
+                hits.add(p)
+                break
+    return len(hits)
+
+
+def check_icon_boxes(css):
+    """An icon locked inside its own rounded, filled box: the container reflex."""
+    hits = set()
+    for m in CSS_RULE.finditer(css):
+        sel, body = m.group(1), m.group(2)
+        base = _rule_base(sel)
+        if not base or not ICON_SEL.search(base):
+            continue
+        rad = ROUND_RADIUS.search(body)
+        size = SQUARE_SIZE.search(body)
+        if not rad or not size:
+            continue
+        w, h = float(size.group(1)), float(size.group(2))
+        if not (16 <= w <= 64 and 16 <= h <= 64):
+            continue
+        if rad.group(1).strip() in ("0", "0px"):
+            continue
+        if BOX_BG.search(body) or BOX_BORDER.search(body):
+            hits.add(base)
+    return len(hits)
+
+
+def _class_set(attrs):
+    m = re.search(r"class\s*=\s*[\"']([^\"']*)[\"']", attrs, re.I)
+    return set(m.group(1).split()) if m else set()
+
+
+CONTAINER_TAGS = {"div", "section", "article", "aside", "li", "main",
+                  "figure", "details", "blockquote"}
+
+
+def check_nested_surfaces(html, css):
+    """A bordered, rounded, filled container inside another one.
+
+    The HTML card check only sees a literal `card` class; this catches
+    `.panel__item`-style nesting. Controls (buttons, inputs) inside a panel
+    are not cards, and a decorative dot inside a pill has no padding, so
+    neither counts. Returns distinct parent->child class pairs.
+    """
+    surfaces = {}
+    for m in CSS_RULE.finditer(css):
+        base = _rule_base(m.group(1))
+        if not base.startswith("."):
+            continue
+        body = m.group(2)
+        if not ROUND_RADIUS.search(body):
+            continue
+        if not (BOX_BG.search(body) or BOX_BORDER.search(body)):
+            continue
+        surfaces[base] = surfaces.get(base, False) or bool(PADDING_DECL.search(body))
+    names = {b[1:] for b in surfaces}
+    if not names:
+        return 0
+    stack = []
+    pairs = set()
+    for m in TAG.finditer(html):
+        closing, tag, attrs, selfclose = m.group(1), m.group(2).lower(), m.group(3), m.group(4)
+        if tag in VOID_TAGS or selfclose:
+            continue
+        if closing:
+            for i in range(len(stack) - 1, -1, -1):
+                if stack[i][0] == tag:
+                    del stack[i:]
+                    break
+            continue
+        cls = _class_set(attrs)
+        if tag in CONTAINER_TAGS and cls:
+            own = [c for c in cls if surfaces.get("." + c)]
+            for ancestor in stack:
+                for a in ancestor[1]:
+                    if a not in names:
+                        continue
+                    for c in own:
+                        if c.startswith(a) and c[len(a):len(a) + 1] in ("_", "-"):
+                            pairs.add((a, c))
+        stack.append((tag, cls))
+    return len(pairs)
+
+
+def _grid_container_classes(css):
+    """Class names of explicit multi-column grids with a gap."""
+    classes = set()
+    for m in CSS_RULE.finditer(css):
+        sel, body = m.group(1), m.group(2)
+        cols = GRID_COLS.search(body)
+        if not cols:
+            continue
+        if not (GRID_REPEAT.search(cols.group(1)) or GRID_AUTOFIT.search(cols.group(1))):
+            continue
+        if not GRID_GAP.search(body):
+            continue
+        classes.update(re.findall(r"\.([A-Za-z_][\w-]*)", sel))
+    return classes
+
+
+def check_uniform_feature_grid(html, css):
+    """The N-up feature grid: 3+ interchangeable cells, each heading + body."""
+    grid = _grid_container_classes(css)
+    if not grid:
+        return 0
+    stack = []
+    hits = 0
+    for m in TAG.finditer(html):
+        closing, tag, attrs, selfclose = m.group(1), m.group(2).lower(), m.group(3), m.group(4)
+        if tag in VOID_TAGS or selfclose:
+            continue
+        if closing:
+            for i in range(len(stack) - 1, -1, -1):
+                if stack[i]["tag"] == tag:
+                    frames = stack[i:]
+                    del stack[i:]
+                    for f in reversed(frames):
+                        feat = f["heading"] and f["para"]
+                        if stack:
+                            parent = stack[-1]
+                            if feat:
+                                parent["cells"] += 1
+                            parent["heading"] = parent["heading"] or f["heading"]
+                            parent["para"] = parent["para"] or f["para"]
+                        if f["grid"] and f["cells"] >= 3:
+                            hits += 1
+                    break
+            continue
+        if tag in ("h1", "h2", "h3", "h4") and stack:
+            stack[-1]["heading"] = True
+        if tag == "p" and stack:
+            stack[-1]["para"] = True
+        stack.append({"tag": tag, "heading": False, "para": False, "cells": 0,
+                      "grid": bool(_class_set(attrs) & grid)})
+    return hits
+
+
 def check_numbered_steps(html):
     hits = 0
     for m in OL_BLOCK.finditer(html):
@@ -556,6 +755,10 @@ def build_report(root: str, blobs: dict):
     out["distinct_radius_values"] = len(radii)
     out["radius_tokens"] = radii
     out["nested_cards"] = check_nested_cards(html)
+    out["status_pill"] = check_status_pill(css)
+    out["icon_box"] = check_icon_boxes(css)
+    out["nested_surfaces"] = check_nested_surfaces(html, css)
+    out["uniform_feature_grid"] = check_uniform_feature_grid(html, css)
     out["numbered_steps"] = check_numbered_steps(html)
     out["step_prose"] = len(STEP_PROSE.findall(html))
     out["shadcn_tokens"] = bool(SHADCN_TOKENS.search(css))
@@ -613,6 +816,14 @@ def build_report(root: str, blobs: dict):
         add("top_accent_borders", out["top_accent_borders"], out["top_accent_borders"])
     if out["nested_cards"]:
         add("nested_cards", out["nested_cards"], out["nested_cards"])
+    if out["status_pill"]:
+        add("status_pill", out["status_pill"], out["status_pill"])
+    if out["icon_box"] >= 2:
+        add("icon_box", out["icon_box"], out["icon_box"])
+    if out["nested_surfaces"]:
+        add("nested_surfaces", out["nested_surfaces"], out["nested_surfaces"])
+    if out["uniform_feature_grid"]:
+        add("uniform_feature_grid", out["uniform_feature_grid"], out["uniform_feature_grid"])
     if out["numbered_steps"]:
         add("numbered_steps", out["numbered_steps"], out["numbered_steps"])
     if out["stat_banner_hits"]:

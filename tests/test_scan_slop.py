@@ -147,6 +147,32 @@ case("counting: tell_count is distinct patterns", sloppy2["tell_count"] <
 case("counting: threshold is 4", scan.TELL_THRESHOLD == 4)
 case("counting: clean has zero distinct tells", clean["tell_count"] == 0)
 
+# 11. container-reflex tells: status pill with a dot, icon locked in a box
+pb, pcode = run("pillbox")
+case("pillbox: status pill with dot flagged", pb["status_pill"] == 1, pb.get("status_pill"))
+case("pillbox: icon boxes flagged", pb["icon_box"] >= 2, pb.get("icon_box"))
+pb_found = {f["check"] for f in pb["findings"]}
+case("pillbox: both surface as findings",
+     {"status_pill", "icon_box"} <= pb_found, sorted(pb_found))
+case("clean: no status pill false positive", clean["status_pill"] == 0, clean.get("status_pill"))
+case("clean: no icon box false positive", clean["icon_box"] == 0, clean.get("icon_box"))
+case("sloppy: a plain pill with no dot is not a status pill",
+     sloppy["status_pill"] == 0, sloppy.get("status_pill"))
+case("sloppy: an icon-free page has no icon boxes", sloppy["icon_box"] == 0,
+     sloppy.get("icon_box"))
+
+# 12. general box sprawl: nested surfaces + uniform feature grid
+bx, _ = run("boxgrid")
+case("boxgrid: nested surface flagged", bx["nested_surfaces"] >= 1, bx.get("nested_surfaces"))
+case("boxgrid: uniform feature grid flagged", bx["uniform_feature_grid"] >= 1,
+     bx.get("uniform_feature_grid"))
+case("clean: no nested surface false positive", clean["nested_surfaces"] == 0,
+     clean.get("nested_surfaces"))
+case("clean: no uniform grid false positive", clean["uniform_feature_grid"] == 0,
+     clean.get("uniform_feature_grid"))
+case("sloppy: plain nested card is not a nested surface box",
+     sloppy["nested_surfaces"] == 0, sloppy.get("nested_surfaces"))
+
 print()
 if FAILS:
     print(f"{len(FAILS)} failing: {FAILS}")

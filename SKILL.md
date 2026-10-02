@@ -100,6 +100,10 @@ These aren't banned because they're bad typefaces — several are excellent. The
   badge wearing a costume; a fake founding-date eyebrow ("EST. WHEREVER YOU
   THINK") is a template eyebrow wearing a joke. Genuine status badges (beta,
   price, availability) pass because they complete the sentence.
+- Icons sit bare. An icon locked inside its own rounded, filled box is the
+  container reflex: box a glyph only when the box is a control or carries state.
+- A pill with a leading status dot reads as live state. If nothing is actually
+  live (a count, a sync status, availability), the dot is decoration. Drop it.
 
 ## Rule 4 — CSS discipline: one of everything
 
